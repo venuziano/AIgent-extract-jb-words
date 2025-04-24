@@ -4,9 +4,7 @@ from pydantic import BaseModel, Field, PrivateAttr
 from langchain.schema import BaseMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode
 
-# 1) Define your schema with only the real inputs public
 class JobSchema(BaseModel):
     jobList:      List[str] = Field(
         ...,
@@ -20,10 +18,8 @@ class JobSchema(BaseModel):
     descriptions: List[str] = Field(default_factory=list, exclude=True)
     responses: List[BaseMessage] = Field(default_factory=list, exclude=True)
 
-# 2) Init your LLM
 model = ChatOpenAI(model="o4-mini", verbose=True)
 
-# 3) Scrape node: fetch each URL and pull out the JD text
 def scrape_descriptions(state: JobSchema):
     """
     Scrape each URL in state.jobList for its job description,
@@ -36,7 +32,6 @@ def scrape_descriptions(state: JobSchema):
         for url in state.jobList:
             try:
                 page.goto(url, wait_until="domcontentloaded")
-                # wait for our target container to appear (or timeout)
                 page.wait_for_selector("div.job-description, div#jobDescriptionText",
                                        timeout=3000)
                 job_div = page.query_selector("div.job-description, div#jobDescriptionText")
@@ -52,7 +47,6 @@ def scrape_descriptions(state: JobSchema):
     
     return {"descriptions": descs}
 
-# 4) LLM node: build prompts from the scraped text and invoke
 def extract_keywords(state: JobSchema):
     """
     Build prompts asking the LLM to extract the top
@@ -74,7 +68,6 @@ def extract_keywords(state: JobSchema):
 
     return {"responses": state.responses}
 
-# 5) Final node: pull out the text and return it as the graph’s output
 def emit_keywords(state: JobSchema):
     """
     Pull the .content field from each BaseMessage in state.responses
@@ -82,10 +75,8 @@ def emit_keywords(state: JobSchema):
     """
     return {"keywords": state.responses.content}
 
-# 6) Wire it all up in a StateGraph
 builder = StateGraph(JobSchema)
 
-# wrap each step in a ToolNode so LangGraph knows these are “owned” tools
 builder.add_node(
     "scrape_job_url", 
     scrape_descriptions
