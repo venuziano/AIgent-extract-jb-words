@@ -1,7 +1,6 @@
 {
   "dockerfile_lines": [],
   "graphs": {
-    "simple_graph": "./simple.py:graph",
     "agent": "./agent.py:graph"
   },
   "env": "./.env",
