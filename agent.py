@@ -1,5 +1,5 @@
 from typing import List
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError
 from pydantic import BaseModel, Field, PrivateAttr
 from langchain.schema import BaseMessage, SystemMessage
 from langchain_openai import ChatOpenAI
@@ -34,12 +34,18 @@ def scrape_descriptions(state: JobSchema):
         browser = pw.chromium.launch(headless=True)
         page = browser.new_page()
         for url in state.jobList:
-            page.goto(url, wait_until="networkidle")
-            # adjust this selector to match the real description container
-            job_div = page.query_selector("div.job-description, div#jobDescriptionText")
-            if not job_div:
+            try:
+                page.goto(url, wait_until="domcontentloaded")
+                # wait for our target container to appear (or timeout)
+                page.wait_for_selector("div.job-description, div#jobDescriptionText",
+                                       timeout=3000)
+                job_div = page.query_selector("div.job-description, div#jobDescriptionText")
+            except TimeoutError:
+                print(f"⚠️  {url} timed out; using <body> instead")
                 job_div = page.query_selector("body")
-            descs.append(job_div.inner_text().strip())
+
+            text = job_div.inner_text().strip() if job_div else ""
+            descs.append(text)
         browser.close()
     
     state.descriptions = descs
@@ -81,22 +87,22 @@ builder = StateGraph(JobSchema)
 
 # wrap each step in a ToolNode so LangGraph knows these are “owned” tools
 builder.add_node(
-    "scrape", 
+    "scrape_job_url", 
     scrape_descriptions
 )
 builder.add_node(
-    "llm", 
+    "extract_keywords", 
     extract_keywords
 )
 builder.add_node(
-    "emit", 
+    "display_keywords", 
     emit_keywords
 )
 
 # define edges: START → scrape → llm → emit → END
-builder.add_edge(START, "scrape")
-builder.add_edge("scrape", "llm")
-builder.add_edge("llm", "emit")
-builder.add_edge("emit", END)
+builder.add_edge(START, "scrape_job_url")
+builder.add_edge("scrape_job_url", "extract_keywords")
+builder.add_edge("extract_keywords", "display_keywords")
+builder.add_edge("display_keywords", END)
 
 graph = builder.compile()
