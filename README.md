@@ -3,10 +3,10 @@
 An AI agent that extracts keywords from a given job description URL. You can use these keywords effectively to boost your résumé.
 
 ### LangSmith Studio
-![](langsmith)
+![](readme/langsmith.png)
 
 ### LangSmith Studio Trace
-![](langsmith-tracec)
+![](readme/langsmith-trace.png)
 
 ### How to Run
 
