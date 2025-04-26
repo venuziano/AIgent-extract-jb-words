@@ -6,15 +6,14 @@ from langchain_openai import ChatOpenAI
 from langgraph.graph import StateGraph, START, END
 
 class JobSchema(BaseModel):
-    jobList:      List[str] = Field(
+    jobList: List[str] = Field(
         ...,
         description="List of job‐posting URLs to scrape",
     )
-    numberWords:  int        = Field(
+    numberWords: int = Field(
         default=10,
         description="How many keywords to extract per description",
     )
-    # private buffers, never treated as inputs
     descriptions: List[str] = Field(default_factory=list, exclude=True)
     responses: List[BaseMessage] = Field(default_factory=list, exclude=True)
 
@@ -68,13 +67,6 @@ def extract_keywords(state: JobSchema):
 
     return {"responses": state.responses}
 
-def emit_keywords(state: JobSchema):
-    """
-    Pull the .content field from each BaseMessage in state.responses
-    and return it under the key "keywords" as the graph’s output.
-    """
-    return {"keywords": state.responses.content}
-
 builder = StateGraph(JobSchema)
 
 builder.add_node(
@@ -85,15 +77,9 @@ builder.add_node(
     "extract_keywords", 
     extract_keywords
 )
-builder.add_node(
-    "display_keywords", 
-    emit_keywords
-)
 
-# define edges: START → scrape → llm → emit → END
 builder.add_edge(START, "scrape_job_url")
 builder.add_edge("scrape_job_url", "extract_keywords")
-builder.add_edge("extract_keywords", "display_keywords")
-builder.add_edge("display_keywords", END)
+builder.add_edge("extract_keywords", END)
 
 graph = builder.compile()
